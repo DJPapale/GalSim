@@ -48,6 +48,7 @@ test_fwhm = 1.8
 test_sigma = 1.8
 test_scale = 1.8
 test_sersic_n = [1.5, 2.5]
+test_sersic_trunc = [0., 8.5]
 
 # for flux normalization tests
 test_flux = 1.8
@@ -57,7 +58,7 @@ test_flux = 1.8
 glob_ud = galsim.UniformDeviate(12345)
 
 # These are the default GSParams used when unspecified.  We'll check that specifying 
-# these explcitly produces the same results.
+# these explicitly produces the same results.
 default_params = galsim.GSParams(
         minimum_fft_size = 128,
         maximum_fft_size = 4096,
@@ -169,11 +170,11 @@ def do_shoot(prof, img, name):
     compar.setFlux(test_flux)
     compar.draw(img, normalization="surface brightness")
     print 'img.sum = ',img.array.sum(),'  cf. ',test_flux/(dx*dx)
-    np.testing.assert_almost_equal(img.array.sum() * dx*dx, test_flux, 5,
+    np.testing.assert_almost_equal(img.array.sum() * dx*dx, test_flux, 4,
             err_msg="Surface brightness normalization for %s disagrees with expected result"%name)
     compar.draw(img, normalization="flux")
     print 'img.sum = ',img.array.sum(),'  cf. ',test_flux
-    np.testing.assert_almost_equal(img.array.sum(), test_flux, 5,
+    np.testing.assert_almost_equal(img.array.sum(), test_flux, 4,
             err_msg="Flux normalization for %s disagrees with expected result"%name)
 
     prof.setFlux(test_flux)
@@ -238,7 +239,8 @@ def test_gaussian():
 
     # Repeat with the GSObject version of this:
     gauss = galsim.Gaussian(flux=1, sigma=1)
-    myImg = gauss.draw(myImg, dx=dx, normalization="surface brightness")
+    # Reference images were made with old centering, which is equivalent to use_true_center=False.
+    myImg = gauss.draw(myImg, dx=dx, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Gaussian disagrees with expected result")
@@ -250,7 +252,7 @@ def test_gaussian():
     print myImg.bounds
     recImg = galsim.ImageF(45,66)
     recImg.setCenter(0,0)
-    recImg = gauss.draw(recImg, dx=dx, normalization="surface brightness")
+    recImg = gauss.draw(recImg, dx=dx, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             recImg[savedImg.bounds].array, savedImg.array, 5,
             err_msg="Drawing Gaussian on non-square image disagrees with expected result")
@@ -260,12 +262,12 @@ def test_gaussian():
 
     # Check with default_params
     gauss = galsim.Gaussian(flux=1, sigma=1, gsparams=default_params)
-    gauss.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Gaussian with default_params disagrees with expected result")
     gauss = galsim.Gaussian(flux=1, sigma=1, gsparams=galsim.GSParams())
-    gauss.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Gaussian with GSParams() disagrees with expected result")
@@ -475,19 +477,19 @@ def test_exponential():
 
     # Repeat with the GSObject version of this:
     expon = galsim.Exponential(flux=1., scale_radius=r0)
-    expon.draw(myImg,dx=0.2, normalization="surface brightness")
+    expon.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Exponential disagrees with expected result")
 
     # Check with default_params
     expon = galsim.Exponential(flux=1., scale_radius=r0, gsparams=default_params)
-    expon.draw(myImg,dx=0.2, normalization="surface brightness")
+    expon.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Exponential with default_params disagrees with expected result")
     expon = galsim.Exponential(flux=1., scale_radius=r0, gsparams=galsim.GSParams())
-    expon.draw(myImg,dx=0.2, normalization="surface brightness")
+    expon.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Exponential with GSParams() disagrees with expected result")
@@ -556,6 +558,8 @@ def test_sersic():
     """
     import time
     t1 = time.time()
+
+    # Test SBSersic
     mySBP = galsim.SBSersic(n=3, flux=1, half_light_radius=1)
     savedImg = galsim.fits.read(os.path.join(imgdir, "sersic_3_1.fits"))
     myImg = galsim.ImageF(savedImg.bounds)
@@ -568,19 +572,19 @@ def test_sersic():
 
     # Repeat with the GSObject version of this:
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1)
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Sersic disagrees with expected result")
 
     # Check with default_params
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1, gsparams=default_params)
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Sersic with default_params disagrees with expected result")
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1, gsparams=galsim.GSParams())
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Sersic with GSParams() disagrees with expected result")
@@ -589,6 +593,32 @@ def test_sersic():
     # Convolve with a small gaussian to smooth out the central peak.
     sersic2 = galsim.Convolve(sersic, galsim.Gaussian(sigma=0.3))
     do_shoot(sersic2,myImg,"Sersic")
+
+    # Now repeat everything using a truncation.  (Above had no truncation.)
+
+    # Test Truncated SBSersic
+    mySBP = galsim.SBSersic(n=3, flux=1, half_light_radius=1, trunc=10)
+    savedImg = galsim.fits.read(os.path.join(imgdir, "sersic_3_1_10.fits"))
+    myImg = galsim.ImageF(savedImg.bounds)
+    myImg.setScale(0.2)
+    mySBP.draw(myImg.view())
+    printval(myImg, savedImg)
+    np.testing.assert_array_almost_equal(
+            myImg.array, savedImg.array, 5,
+            err_msg="Truncated Sersic profile disagrees with expected result")
+
+    # Repeat with the GSObject version of this:
+    sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1, trunc=10)
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
+    np.testing.assert_array_almost_equal(
+            myImg.array, savedImg.array, 5,
+            err_msg="Using truncated GSObject Sersic disagrees with expected result")
+
+    # Test photon shooting.
+    # Convolve with a small gaussian to smooth out the central peak.
+    sersic2 = galsim.Convolve(sersic, galsim.Gaussian(sigma=0.3))
+    do_shoot(sersic2,myImg,"Truncated Sersic")
+
     t2 = time.time()
     print 'time for %s = %.2f'%(funcname(),t2-t1)
 
@@ -600,41 +630,104 @@ def test_sersic_radii():
     t1 = time.time()
     import math
     for n in test_sersic_n:
-        # Test constructor using half-light-radius: (only option for sersic)
-        test_gal = galsim.Sersic(n=n, half_light_radius=test_hlr, flux=1.)
+        for trunc in test_sersic_trunc:
+            # Test constructor using half-light-radius: (only option for sersic)
+            test_gal = galsim.Sersic(n=n, half_light_radius=test_hlr, trunc=trunc, flux=1.)
+            hlr_sum = radial_integrate(test_gal, 0., test_hlr, 1.e-4)
+            print 'hlr_sum = ',hlr_sum
+            np.testing.assert_almost_equal(
+                    hlr_sum, 0.5, decimal=4,
+                    err_msg="Error in Sersic constructor with half-light radius, n=%d, trunc=%d"\
+                             %(n,trunc))
+
+            # Test with flux_untruncated=True (above unit tests for flux_untruncated=False)
+            test_gal = galsim.Sersic(n=n, half_light_radius=test_hlr, trunc=trunc, flux=1.,
+                                     flux_untruncated=True)
+            hlr_sum = radial_integrate(test_gal, 0., test_hlr, 1.e-4)
+            print 'hlr_sum (truncated and flux_untruncated) = ',hlr_sum
+            np.testing.assert_almost_equal(
+                    hlr_sum, 0.5, decimal=4,
+                    err_msg="Error in Sersic constructor with flux_untruncated, n=%d, trunc=%d"\
+                             %(n,trunc))
+
+            # Check that the getters don't work after modifying the original.
+            test_gal_shear = test_gal.copy()
+            print 'n = ',test_gal_shear.getN()
+            print 'hlr = ',test_gal_shear.getHalfLightRadius()
+            test_gal_shear.applyShear(g1=0.3, g2=0.1)
+            try:
+                np.testing.assert_raises(AttributeError, getattr, test_gal_shear, "getN");
+                np.testing.assert_raises(AttributeError, getattr, test_gal_shear, 
+                                         "getHalfLightRadius")
+            except ImportError:
+                pass
+
+    for n in test_sersic_n:
+        for trunc in test_sersic_trunc:
+            # Test flux_untruncated scale and normalization
+            test_gal = galsim.Sersic(n=n, half_light_radius=test_hlr, flux=1.)
+
+            test_gal2 = galsim.Sersic(n=n, half_light_radius=test_hlr, trunc=trunc, flux=1.,
+                                      flux_untruncated=True)
+            center = test_gal.xValue(galsim.PositionD(0,0))
+            center2 = test_gal2.xValue(galsim.PositionD(0,0))
+            ratio = center / center2
+            print 'peak value = ', center, center2
+            print 'hlr = ', test_gal.getHalfLightRadius(), test_gal2.getHalfLightRadius()
+            np.testing.assert_almost_equal(ratio, 1., 9,
+                                           "Error in Sersic flux_untruncated=True normalization")
+
+            # Test true HLR with flux_untruncated=True
+            true_hlr = test_gal2.getHalfLightRadius()
+            hlr_sum = radial_integrate(test_gal, 0., true_hlr, 1.e-4)
+            true_flux = test_gal2.getFlux()
+            print 'true hlr_sum = ',hlr_sum
+            np.testing.assert_almost_equal(
+                    hlr_sum, 0.5*true_flux, decimal=4,
+                    err_msg="Error in true half-light radius with flux_untruncated, n=%d, trunc=%d"\
+                             %(n,trunc))
+
+    # Repeat the above for an explicit DeVaucouleurs.  (Same as n=4, but special name.)
+    for trunc in test_sersic_trunc:
+        # Test constuctor
+        test_gal = galsim.DeVaucouleurs(half_light_radius=test_hlr, trunc=trunc, flux=1.)
         hlr_sum = radial_integrate(test_gal, 0., test_hlr, 1.e-4)
         print 'hlr_sum = ',hlr_sum
         np.testing.assert_almost_equal(
                 hlr_sum, 0.5, decimal=4,
-                err_msg="Error in Sersic constructor with half-light radius, n = %d"%n)
+                err_msg="Error in DeVaucouleurs constructor with half-light radius, trunc=%d"\
+                         %trunc)
 
         # Check that the getters don't work after modifying the original.
         test_gal_shear = test_gal.copy()
-        print 'n = ',test_gal_shear.getN()
         print 'hlr = ',test_gal_shear.getHalfLightRadius()
         test_gal_shear.applyShear(g1=0.3, g2=0.1)
         try:
-            np.testing.assert_raises(AttributeError, getattr, test_gal_shear, "getN");
             np.testing.assert_raises(AttributeError, getattr, test_gal_shear, "getHalfLightRadius")
         except ImportError:
             pass
 
-    # Repeat the above for an explicit DeVaucouleurs.  (Same as n=4, but special name.)
-    test_gal = galsim.DeVaucouleurs(half_light_radius=test_hlr, flux=1.)
-    hlr_sum = radial_integrate(test_gal, 0., test_hlr, 1.e-4)
-    print 'hlr_sum = ',hlr_sum
-    np.testing.assert_almost_equal(
-            hlr_sum, 0.5, decimal=4,
-            err_msg="Error in Sersic constructor with half-light radius, n = %d"%n)
+    # Test flux_untruncated scale and normalization
+    test_gal = galsim.DeVaucouleurs(half_light_radius=test_hlr, trunc=0., flux=1.)
+    test_gal2 = galsim.DeVaucouleurs(half_light_radius=test_hlr, trunc=trunc, flux=1.,
+                                     flux_untruncated=True)
+    center = test_gal.xValue(galsim.PositionD(0,0))
+    center2 = test_gal2.xValue(galsim.PositionD(0,0))
+    ratio = center / center2
+    print 'peak value = ', center, center2
+    print 'hlr = ', test_gal.getHalfLightRadius(), test_gal2.getHalfLightRadius()
+    np.testing.assert_almost_equal(ratio, 1., 9,
+                                   "Error in DeVaucouleurs flux_untruncated=True normalization")
 
-    # Check that the getters don't work after modifying the original.
-    test_gal_shear = test_gal.copy()
-    print 'hlr = ',test_gal_shear.getHalfLightRadius()
-    test_gal_shear.applyShear(g1=0.3, g2=0.1)
-    try:
-        np.testing.assert_raises(AttributeError, getattr, test_gal_shear, "getHalfLightRadius")
-    except ImportError:
-        pass
+    # Test true HLR with flux_untruncated=True
+    true_hlr = test_gal2.getHalfLightRadius()
+    hlr_sum = radial_integrate(test_gal, 0., true_hlr, 1.e-4)
+    true_flux = test_gal2.getFlux()
+    print 'true hlr_sum = ',hlr_sum
+    np.testing.assert_almost_equal(
+            hlr_sum, 0.5*true_flux, decimal=4,
+            err_msg="Error in DeVaucouleurs true half-light radius with flux_untruncated, trunc=%d"\
+                     %(trunc))
 
     t2 = time.time()
     print 'time for %s = %.2f'%(funcname(),t2-t1)
@@ -656,19 +749,19 @@ def test_airy():
 
     # Repeat with the GSObject version of this:
     airy = galsim.Airy(lam_over_diam=1./0.8, obscuration=0.1, flux=1)
-    airy.draw(myImg,dx=0.2, normalization="surface brightness")
+    airy.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Airy disagrees with expected result")
 
     # Check with default_params
     airy = galsim.Airy(lam_over_diam=1./0.8, obscuration=0.1, flux=1, gsparams=default_params)
-    airy.draw(myImg,dx=0.2, normalization="surface brightness")
+    airy.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Airy with default_params disagrees with expected result")
     airy = galsim.Airy(lam_over_diam=1./0.8, obscuration=0.1, flux=1, gsparams=galsim.GSParams())
-    airy.draw(myImg,dx=0.2, normalization="surface brightness")
+    airy.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Airy with GSParams() disagrees with expected result")
@@ -738,19 +831,19 @@ def test_box():
 
     # Repeat with the GSObject version of this:
     pixel = galsim.Pixel(xw=1, yw=1, flux=1)
-    pixel.draw(myImg,dx=0.2, normalization="surface brightness")
+    pixel.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Pixel disagrees with expected result")
 
     # Check with default_params
     pixel = galsim.Pixel(xw=1, yw=1, flux=1, gsparams=default_params)
-    pixel.draw(myImg,dx=0.2, normalization="surface brightness")
+    pixel.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Pixel with default_params disagrees with expected result")
     pixel = galsim.Pixel(xw=1, yw=1, flux=1, gsparams=galsim.GSParams())
-    pixel.draw(myImg,dx=0.2, normalization="surface brightness")
+    pixel.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Pixel with GSParams() disagrees with expected result")
@@ -786,7 +879,7 @@ def test_moffat():
 
     # Repeat with the GSObject version of this:
     moffat = galsim.Moffat(beta=2, half_light_radius=1, trunc=5*fwhm_backwards_compatible, flux=1)
-    moffat.draw(myImg,dx=0.2, normalization="surface brightness")
+    moffat.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Moffat disagrees with expected result")
@@ -794,13 +887,13 @@ def test_moffat():
     # Check with default_params
     moffat = galsim.Moffat(beta=2, half_light_radius=1, trunc=5*fwhm_backwards_compatible, flux=1, 
                            gsparams=default_params)
-    moffat.draw(myImg,dx=0.2, normalization="surface brightness")
+    moffat.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Moffat with default_params disagrees with expected result")
     moffat = galsim.Moffat(beta=2, half_light_radius=1, trunc=5*fwhm_backwards_compatible, flux=1, 
                            gsparams=galsim.GSParams())
-    moffat.draw(myImg,dx=0.2, normalization="surface brightness")
+    moffat.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Moffat with GSParams() disagrees with expected result")
@@ -942,7 +1035,7 @@ def test_moffat_radii():
             test_scale_ratio, 2.**(-test_beta), decimal=4,
             err_msg="Error in scale radius for Moffat initialized with scale radius")
 
-    # Now repeat everything using a severe trunctation.  (Above had no truncation.)
+    # Now repeat everything using a severe truncation.  (Above had no truncation.)
 
     # Test constructor using half-light-radius:
     test_gal = galsim.Moffat(flux = 1., beta=test_beta, half_light_radius = test_hlr,
@@ -1068,19 +1161,19 @@ def test_kolmogorov():
 
     # Repeat with the GSObject version of this:
     kolm = galsim.Kolmogorov(lam_over_r0=1.5, flux=1.8)
-    kolm.draw(myImg,dx=0.2, normalization="surface brightness")
+    kolm.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Kolmogorov disagrees with expected result")
 
     # Check with default_params
     kolm = galsim.Kolmogorov(lam_over_r0=1.5, flux=1.8, gsparams=default_params)
-    kolm.draw(myImg,dx=0.2, normalization="surface brightness")
+    kolm.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Kolmogorov with default_params disagrees with expected result")
     kolm = galsim.Kolmogorov(lam_over_r0=1.5, flux=1.8, gsparams=galsim.GSParams())
-    kolm.draw(myImg,dx=0.2, normalization="surface brightness")
+    kolm.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Kolmogorov with GSParams() disagrees with expected result")
@@ -1089,7 +1182,7 @@ def test_kolmogorov():
     # This tests the equivalence between xValue and kValue calculations.
     delta = galsim.Gaussian(sigma=1.e-8)
     conv = galsim.Convolve([kolm,delta])
-    conv.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 3,
             err_msg="Kolmogorov * delta disagrees with expected result")
@@ -1262,25 +1355,25 @@ def test_smallshear():
     # Repeat with the GSObject version of this:
     gauss = galsim.Gaussian(flux=1, sigma=1)
     gauss.applyShear(myShear)
-    gauss.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShear disagrees with expected result")
     gauss = galsim.Gaussian(flux=1, sigma=1)
     gauss2 = gauss.createSheared(myShear)
-    gauss2.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject createSheared disagrees with expected result")
     gauss = galsim.Gaussian(flux=1, sigma=1)
     gauss.applyTransformation(myEllipse)
-    gauss.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyTransformation disagrees with expected result")
     gauss = galsim.Gaussian(flux=1, sigma=1)
     gauss2 = gauss.createTransformed(myEllipse)
-    gauss2.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject createTransformed disagrees with expected result")
@@ -1288,13 +1381,13 @@ def test_smallshear():
     # Check with default_params
     gauss = galsim.Gaussian(flux=1, sigma=1, gsparams=default_params)
     gauss.applyShear(myShear)
-    gauss.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShear with default_params disagrees with expected result")
     gauss = galsim.Gaussian(flux=1, sigma=1, gsparams=galsim.GSParams())
     gauss.applyShear(myShear)
-    gauss.draw(myImg,dx=0.2, normalization="surface brightness")
+    gauss.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShear with GSParams() disagrees with expected result")
@@ -1338,25 +1431,25 @@ def test_largeshear():
     # Repeat with the GSObject version of this:
     devauc = galsim.DeVaucouleurs(flux=1, half_light_radius=1)
     devauc.applyShear(myShear)
-    devauc.draw(myImg,dx=0.2, normalization="surface brightness")
+    devauc.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShear disagrees with expected result")
     devauc = galsim.DeVaucouleurs(flux=1, half_light_radius=1)
     devauc2 = devauc.createSheared(myShear)
-    devauc2.draw(myImg,dx=0.2, normalization="surface brightness")
+    devauc2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject createSheared disagrees with expected result")
     devauc = galsim.DeVaucouleurs(flux=1, half_light_radius=1)
     devauc.applyTransformation(myEllipse)
-    devauc.draw(myImg,dx=0.2, normalization="surface brightness")
+    devauc.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyTransformation disagrees with expected result")
     devauc = galsim.DeVaucouleurs(flux=1, half_light_radius=1)
     devauc2 = devauc.createTransformed(myEllipse)
-    devauc2.draw(myImg,dx=0.2, normalization="surface brightness")
+    devauc2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject createTransformed disagrees with expected result")
@@ -1364,13 +1457,13 @@ def test_largeshear():
     # Check with default_params
     devauc = galsim.DeVaucouleurs(flux=1, half_light_radius=1, gsparams=default_params)
     devauc.applyShear(myShear)
-    devauc.draw(myImg,dx=0.2, normalization="surface brightness")
+    devauc.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShear with default_params disagrees with expected result")
     devauc = galsim.DeVaucouleurs(flux=1, half_light_radius=1, gsparams=galsim.GSParams())
     devauc.applyShear(myShear)
-    devauc.draw(myImg,dx=0.2, normalization="surface brightness")
+    devauc.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShear with GSParams() disagrees with expected result")
@@ -1423,27 +1516,27 @@ def test_convolve():
         warnings.simplefilter("ignore")
         # We'll do the real space convolution below
         conv = galsim.Convolve([psf,pixel],real_space=False)
-        conv.draw(myImg,dx=0.2, normalization="surface brightness")
+        conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
         np.testing.assert_array_almost_equal(
                 myImg.array, savedImg.array, 4,
                 err_msg="Using GSObject Convolve([psf,pixel]) disagrees with expected result")
 
         # Other ways to do the convolution:
         conv = galsim.Convolve(psf,pixel,real_space=False)
-        conv.draw(myImg,dx=0.2, normalization="surface brightness")
+        conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
         np.testing.assert_array_almost_equal(
                 myImg.array, savedImg.array, 4,
                 err_msg="Using GSObject Convolve(psf,pixel) disagrees with expected result")
 
         # Check with default_params
         conv = galsim.Convolve([psf,pixel],real_space=False,gsparams=default_params)
-        conv.draw(myImg,dx=0.2, normalization="surface brightness")
+        conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
         np.testing.assert_array_almost_equal(
                 myImg.array, savedImg.array, 4,
                 err_msg="Using GSObject Convolve([psf,pixel]) with default_params disagrees with"
                 "expected result")
         conv = galsim.Convolve([psf,pixel],real_space=False,gsparams=galsim.GSParams())
-        conv.draw(myImg,dx=0.2, normalization="surface brightness")
+        conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
         np.testing.assert_array_almost_equal(
                 myImg.array, savedImg.array, 4,
                 err_msg="Using GSObject Convolve([psf,pixel]) with GSParams() disagrees with"
@@ -1496,12 +1589,12 @@ def test_shearconvolve():
     psf.applyShear(e1=e1, e2=e2)
     pixel = galsim.Pixel(xw=0.2, yw=0.2, flux=1.)
     conv = galsim.Convolve([psf,pixel])
-    conv.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) disagrees with expected result")
     conv2 = galsim.Convolve([psf2,pixel])
-    conv2.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) disagrees with expected result")
@@ -1511,24 +1604,24 @@ def test_shearconvolve():
     pixel = galsim.Pixel(xw=0.2, yw=0.2, flux=1.)
     conv = galsim.Convolve([psf,pixel])
     conv2 = galsim.Convolve([psf2,pixel])
-    conv.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) disagrees with expected result")
-    conv2.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) disagrees with expected result")
 
     # Check with default_params
     conv = galsim.Convolve([psf,pixel],gsparams=default_params)
-    conv.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) with default_params disagrees with "
             "expected result")
     conv = galsim.Convolve([psf,pixel],gsparams=galsim.GSParams())
-    conv.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) with GSParams() disagrees with "
@@ -1536,7 +1629,7 @@ def test_shearconvolve():
  
     # Other ways to do the convolution:
     conv = galsim.Convolve(psf,pixel)
-    conv.draw(myImg,dx=0.2, normalization="surface brightness")
+    conv.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Convolve(psf,pixel) disagrees with expected result")
@@ -1584,20 +1677,20 @@ def test_realspace_convolve():
                         #trunc=4*fwhm_backwards_compatible, flux=1)
     pixel = galsim.Pixel(xw=0.2, yw=0.2, flux=1.)
     conv = galsim.Convolve([psf,pixel],real_space=True)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) disagrees with expected result")
 
     # Check with default_params
     conv = galsim.Convolve([psf,pixel],real_space=True,gsparams=default_params)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) with default_params disagrees with "
             "expected result")
     conv = galsim.Convolve([psf,pixel],real_space=True,gsparams=galsim.GSParams())
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) with GSParams() disagrees with "
@@ -1605,7 +1698,7 @@ def test_realspace_convolve():
 
     # Other ways to do the convolution:
     conv = galsim.Convolve(psf,pixel,real_space=True)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve(psf,pixel) disagrees with expected result")
@@ -1613,7 +1706,7 @@ def test_realspace_convolve():
     # The real-space convolution algorithm is not (trivially) independent of the order of
     # the two things being convolved.  So check the opposite order.
     conv = galsim.Convolve([pixel,psf],real_space=True)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([pixel,psf]) disagrees with expected result")
@@ -1666,20 +1759,20 @@ def test_realspace_distorted_convolve():
     pixel.applyShift(0.13,0.27)
     # NB: real-space is chosen automatically
     conv = galsim.Convolve([psf,pixel])
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using Convolve([psf,pixel]) (distorted) disagrees with expected result")
 
     # Check with default_params
     conv = galsim.Convolve([psf,pixel],gsparams=default_params)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using Convolve([psf,pixel]) (distorted) with default_params disagrees with "
             "expected result")
     conv = galsim.Convolve([psf,pixel],gsparams=galsim.GSParams())
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using Convolve([psf,pixel]) (distorted) with GSParams() disagrees with "
@@ -1687,7 +1780,7 @@ def test_realspace_distorted_convolve():
 
     # Other ways to do the convolution:
     conv = galsim.Convolve(psf,pixel)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using Convolve(psf,pixel) (distorted) disagrees with expected result")
@@ -1695,7 +1788,7 @@ def test_realspace_distorted_convolve():
     # The real-space convolution algorithm is not (trivially) independent of the order of
     # the two things being convolved.  So check the opposite order.
     conv = galsim.Convolve([pixel,psf])
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using Convolve([pixel,psf]) (distorted) disagrees with expected result")
@@ -1731,20 +1824,20 @@ def test_realspace_shearconvolve():
     psf.applyShear(e1=e1,e2=e2)
     pixel = galsim.Pixel(xw=0.2, yw=0.2, flux=1.)
     conv = galsim.Convolve([psf,pixel],real_space=True)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) disagrees with expected result")
 
     # Check with default_params
     conv = galsim.Convolve([psf,pixel],real_space=True,gsparams=default_params)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) with default_params disagrees with "
             "expected result")
     conv = galsim.Convolve([psf,pixel],real_space=True,gsparams=galsim.GSParams())
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([psf,pixel]) with GSParams() disagrees with "
@@ -1752,7 +1845,7 @@ def test_realspace_shearconvolve():
 
     # Other ways to do the convolution:
     conv = galsim.Convolve(psf,pixel,real_space=True)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve(psf,pixel) disagrees with expected result")
@@ -1760,7 +1853,7 @@ def test_realspace_shearconvolve():
     # The real-space convolution algorithm is not (trivially) independent of the order of
     # the two things being convolved.  So check the opposite order.
     conv = galsim.Convolve([pixel,psf],real_space=True)
-    conv.draw(img,dx=0.2, normalization="surface brightness")
+    conv.draw(img,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             img.array, saved_img.array, 5,
             err_msg="Using GSObject Convolve([pixel,psf]) disagrees with expected result")
@@ -1791,7 +1884,7 @@ def test_rotate():
     gal = galsim.Sersic(n=2.5, flux=1, half_light_radius=1)
     gal.applyTransformation(myEllipse);
     gal.applyRotation(45.0 * galsim.degrees)
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyRotation disagrees with expected result")
@@ -1800,7 +1893,7 @@ def test_rotate():
     gal = galsim.Sersic(n=2.5, flux=1, half_light_radius=1, gsparams=default_params)
     gal.applyTransformation(myEllipse);
     gal.applyRotation(45.0 * galsim.degrees)
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyRotation with default_params disagrees with expected "
@@ -1808,7 +1901,7 @@ def test_rotate():
     gal = galsim.Sersic(n=2.5, flux=1, half_light_radius=1, gsparams=galsim.GSParams())
     gal.applyTransformation(myEllipse);
     gal.applyRotation(45.0 * galsim.degrees)
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyRotation with GSParams() disagrees with expected result")
@@ -1843,7 +1936,7 @@ def test_mag():
     # Repeat with the GSObject version of this:
     gal = galsim.Exponential(flux=1, scale_radius=r0)
     gal.applyTransformation(myEll)
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1852,7 +1945,7 @@ def test_mag():
     # Check with default_params
     gal = galsim.Exponential(flux=1, scale_radius=r0, gsparams=default_params)
     gal.applyTransformation(myEll)
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1860,7 +1953,7 @@ def test_mag():
             "expected result")
     gal = galsim.Exponential(flux=1, scale_radius=r0, gsparams=galsim.GSParams())
     gal.applyTransformation(myEll)
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1870,10 +1963,10 @@ def test_mag():
     # Use applyDilation
     gal = galsim.Exponential(flux=1, scale_radius=r0)
     gal.applyDilation(1.5)
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     gal.scaleFlux(1.5**2) # Apply the flux magnification.
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1882,7 +1975,7 @@ def test_mag():
     # Use applyMagnification
     gal = galsim.Exponential(flux=1, scale_radius=r0)
     gal.applyMagnification(1.5**2) # area rescaling factor
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1891,7 +1984,7 @@ def test_mag():
     # Use applyLensing
     gal = galsim.Exponential(flux=1, scale_radius=r0)
     gal.applyLensing(0., 0., 1.5**2) # area rescaling factor
-    gal.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1901,7 +1994,7 @@ def test_mag():
     gal = galsim.Exponential(flux=1, scale_radius=r0)
     gal2 = gal.createDilated(1.5)
     gal2.scaleFlux(1.5**2) # Apply the flux magnification.
-    gal2.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1910,7 +2003,7 @@ def test_mag():
     # Use createMagnified
     gal = galsim.Exponential(flux=1, scale_radius=r0)
     gal2 = gal.createMagnified(1.5**2) # area rescaling factor
-    gal2.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1919,7 +2012,7 @@ def test_mag():
     # Use createLensed
     gal = galsim.Exponential(flux=1, scale_radius=r0)
     gal2 = gal.createLensed(0., 0., 1.5**2) # area rescaling factor
-    gal2.draw(myImg,dx=0.2, normalization="surface brightness")
+    gal2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1981,7 +2074,7 @@ def test_add():
     gauss1 = galsim.Gaussian(flux=0.75, sigma=1)
     gauss2 = galsim.Gaussian(flux=0.25, sigma=3)
     sum = galsim.Add(gauss1,gauss2)
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -1989,13 +2082,13 @@ def test_add():
 
     # Check with default_params
     sum = galsim.Add(gauss1,gauss2,gsparams=default_params)
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Add(gauss1,gauss2) with default_params disagrees with "
             "expected result")
     sum = galsim.Add(gauss1,gauss2,gsparams=galsim.GSParams())
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject Add(gauss1,gauss2) with GSParams() disagrees with "
@@ -2003,20 +2096,20 @@ def test_add():
 
     # Other ways to do the sum:
     sum = gauss1 + gauss2
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject gauss1 + gauss2 disagrees with expected result")
     sum = gauss1.copy()
     sum += gauss2
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject sum = gauss1; sum += gauss2 disagrees with expected result")
     sum = galsim.Add([gauss1,gauss2])
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -2024,14 +2117,14 @@ def test_add():
     gauss1 = galsim.Gaussian(flux=1, sigma=1)
     gauss2 = galsim.Gaussian(flux=1, sigma=3)
     sum = 0.75 * gauss1 + 0.25 * gauss2
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject 0.75 * gauss1 + 0.25 * gauss2 disagrees with expected result")
     sum = 0.75 * gauss1
     sum += 0.25 * gauss2
-    sum.draw(myImg,dx=0.2, normalization="surface brightness")
+    sum.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     printval(myImg, savedImg)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
@@ -2062,13 +2155,13 @@ def test_shift():
     # Repeat with the GSObject version of this:
     pixel = galsim.Pixel(xw=0.2, yw=0.2)
     pixel.applyShift(0.2, -0.2)
-    pixel.draw(myImg,dx=0.2, normalization="surface brightness")
+    pixel.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShift disagrees with expected result")
     pixel = galsim.Pixel(xw=0.2, yw=0.2)
     pixel.applyTransformation(galsim.Ellipse(galsim.PositionD(0.2, -0.2)))
-    pixel.draw(myImg,dx=0.2, normalization="surface brightness")
+    pixel.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyTransformation disagrees with expected result")
@@ -2076,13 +2169,13 @@ def test_shift():
     # Check with default_params
     pixel = galsim.Pixel(xw=0.2, yw=0.2, gsparams=default_params)
     pixel.applyShift(0.2, -0.2)
-    pixel.draw(myImg,dx=0.2, normalization="surface brightness")
+    pixel.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShift with default_params disagrees with expected result")
     pixel = galsim.Pixel(xw=0.2, yw=0.2, gsparams=galsim.GSParams())
     pixel.applyShift(0.2, -0.2)
-    pixel.draw(myImg,dx=0.2, normalization="surface brightness")
+    pixel.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject applyShift with GSParams() disagrees with expected result")
@@ -2112,24 +2205,24 @@ def test_rescale():
     # Repeat with the GSObject version of this:
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1)
     sersic.setFlux(2)
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject setFlux disagrees with expected result")
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1)
     sersic *= 2
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject *= 2 disagrees with expected result")
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1)
     sersic2 = sersic * 2
-    sersic2.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject obj * 2 disagrees with expected result")
     sersic2 = 2 * sersic
-    sersic2.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic2.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject 2 * obj disagrees with expected result")
@@ -2137,34 +2230,35 @@ def test_rescale():
     # Check with default_params
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1, gsparams=default_params)
     sersic *= 2
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject *= 2 with default_params disagrees with expected result")
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1, gsparams=galsim.GSParams())
     sersic *= 2
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Using GSObject *= 2 with GSParams() disagrees with expected result")
  
     # Can also get a flux of 2 by drawing flux=1 twice with add_to_image=True
     sersic = galsim.Sersic(n=3, flux=1, half_light_radius=1)
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness")
-    sersic.draw(myImg,dx=0.2, normalization="surface brightness",add_to_image=True)
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness", use_true_center=False)
+    sersic.draw(myImg,dx=0.2, normalization="surface brightness",add_to_image=True,
+                use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Drawing with add_to_image=True disagrees with expected result")
     # With wmult = 3, the calculated flux should come out right so long as we also 
     # convolve by a pixel:
     sersic3 = galsim.Convolve([sersic, galsim.Pixel(xw=0.2)])
-    myImg2 = sersic3.draw(dx=0.2, wmult=3)
+    myImg2 = sersic3.draw(dx=0.2, wmult=3, use_true_center=False)
     print myImg2.array.sum(), myImg2.added_flux
     np.testing.assert_almost_equal(myImg2.array.sum(), 1., 3,
             err_msg="Drawing with wmult=3 results in wrong flux")
     np.testing.assert_almost_equal(myImg2.added_flux, 1., 3,
             err_msg="Drawing with wmult=3 returned wrong added_flux")
-    myImg2 = sersic3.draw(myImg2, add_to_image=True)
+    myImg2 = sersic3.draw(myImg2, add_to_image=True, use_true_center=False)
     print myImg2.array.sum(), myImg2.added_flux
     np.testing.assert_almost_equal(myImg2.array.sum(), 2., 3,
             err_msg="Drawing with add_to_image=True results in wrong flux")
@@ -2174,14 +2268,14 @@ def test_rescale():
     # Check that the flux works out when adding multiple times.
     gauss = galsim.Gaussian(flux=1.e5, sigma=2.)
     gauss2 = galsim.Convolve([gauss, galsim.Pixel(xw=0.2)])
-    myImg2 = gauss2.draw(dx=0.2, wmult=3)
+    myImg2 = gauss2.draw(dx=0.2, wmult=3, use_true_center=False)
     print 'image size = ',myImg2.array.shape
     print myImg2.array.sum(), myImg2.added_flux
     np.testing.assert_almost_equal(myImg2.array.sum()/1.e5, 1., 4,
             err_msg="Drawing Gaussian results in wrong flux")
     np.testing.assert_almost_equal(myImg2.added_flux/1.e5, 1., 4,
             err_msg="Drawing Gaussian returns wrong added_flux")
-    myImg2 = gauss2.draw(myImg2, add_to_image=True)
+    myImg2 = gauss2.draw(myImg2, add_to_image=True, use_true_center=False)
     print myImg2.array.sum(), myImg2.added_flux
     np.testing.assert_almost_equal(myImg2.array.sum()/1.e5, 2., 4,
             err_msg="Drawing Gaussian with add_to_image=True results in wrong flux")
@@ -2209,18 +2303,18 @@ def test_rescale():
                     "according to the returned added_flux")
 
     # Can also get a flux of 2 using gain = 0.5
-    sersic.draw(myImg, dx=0.2, gain=0.5, normalization="surface brightness")
+    sersic.draw(myImg, dx=0.2, gain=0.5, normalization="surface brightness", use_true_center=False)
     np.testing.assert_array_almost_equal(
             myImg.array, savedImg.array, 5,
             err_msg="Drawing with gain=0.5 disagrees with expected result")
-    myImg2 = sersic3.draw(dx=0.2, wmult=3, gain=0.5)
+    myImg2 = sersic3.draw(dx=0.2, wmult=3, gain=0.5, use_true_center=False)
     np.testing.assert_almost_equal(myImg2.array.sum(), 2., 3,
             err_msg="Drawing with gain=0.5 results in wrong flux")
-    myImg2 = sersic3.draw(dx=0.2, wmult=3, gain=4.)
+    myImg2 = sersic3.draw(dx=0.2, wmult=3, gain=4., use_true_center=False)
     np.testing.assert_almost_equal(myImg2.array.sum(), 0.25, 3,
             err_msg="Drawing with gain=4. results in wrong flux")
     # Check add_to_image in conjunction with gain
-    sersic3.draw(myImg2, gain=4., add_to_image=True)
+    sersic3.draw(myImg2, gain=4., add_to_image=True, use_true_center=False)
     np.testing.assert_almost_equal(myImg2.array.sum(), 0.5, 3,
             err_msg="Drawing with gain=4. results in wrong flux")
  
@@ -2303,10 +2397,11 @@ def test_draw():
         mxx = (((x-mx)**2) * im.array).sum() / flux
         myy = (((y-my)**2) * im.array).sum() / flux
         mxy = ((x-mx) * (y-my) * im.array).sum() / flux
-        np.testing.assert_almost_equal(mxy, 0, 2, "Found mxy != 0 for Exponential draw")
-        np.testing.assert_almost_equal(mxx-myy, 0, 2, "Found mxx != myy for Exponential draw")
-        s2 = (mxx+myy) / 6
-        return np.sqrt(s2) * im.scale
+        print flux,mx,my,mxx,myy,mxy
+        s2 = mxx+myy
+        np.testing.assert_almost_equal((mxx-myy)/s2, 0, 5, "Found e1 != 0 for Exponential draw")
+        np.testing.assert_almost_equal(2*mxy/s2, 0, 5, "Found e2 != 0 for Exponential draw")
+        return np.sqrt(s2/6) * im.scale
  
 
     # First test draw() with no kwargs.  It should:
@@ -2517,6 +2612,145 @@ def test_draw():
     t2 = time.time()
     print 'time for %s = %.2f'%(funcname(),t2-t1)
 
+def test_autoconvolve():
+    """Test that auto-convolution works the same as convolution with itself.
+    """
+    import time
+    t1 = time.time()
+
+    mySBP = galsim.SBMoffat(beta=3.8, fwhm=1.3, flux=5)
+    myConv = galsim.SBConvolve([mySBP,mySBP])
+    myImg1 = galsim.ImageF(80,80)
+    myImg1.setScale(0.4)
+    myConv.draw(myImg1.view())
+    myAutoConv = galsim.SBAutoConvolve(mySBP)
+    myImg2 = galsim.ImageF(80,80)
+    myImg2.setScale(0.4)
+    myAutoConv.draw(myImg2.view())
+    printval(myImg1, myImg2)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Moffat convolved with self disagrees with SBAutoConvolve result")
+
+    # Repeat with the GSObject version of this:
+    psf = galsim.Moffat(beta=3.8, fwhm=1.3, flux=5)
+    conv = galsim.Convolve([psf,psf])
+    conv.draw(myImg1)
+    conv2 = galsim.AutoConvolve(psf)
+    conv2.draw(myImg2)
+    printval(myImg1, myImg2)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Moffat convolved with self disagrees with AutoConvolve result")
+
+    # Check with default_params
+    conv = galsim.AutoConvolve(psf, gsparams=default_params)
+    conv.draw(myImg1)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Using AutoConvolve with default_params disagrees with expected result")
+    conv = galsim.AutoConvolve(psf, gsparams=galsim.GSParams())
+    conv.draw(myImg1)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Using AutoConvolve with GSParams() disagrees with expected result")
+
+    # For a symmetric profile, AutoCorrelate is the same thing:
+    conv2 = galsim.AutoCorrelate(psf)
+    conv2.draw(myImg2)
+    printval(myImg1, myImg2)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Moffat convolved with self disagrees with AutoCorrelate result")
+
+    # And check AutoCorrelate with gsparams:
+    conv2 = galsim.AutoCorrelate(psf, gsparams=default_params)
+    conv2.draw(myImg1)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Using AutoCorrelate with default_params disagrees with expected result")
+    conv2 = galsim.AutoCorrelate(psf, gsparams=galsim.GSParams())
+    conv2.draw(myImg1)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Using AutoCorrelate with GSParams() disagrees with expected result")
+
+    # Test photon shooting.
+    do_shoot(conv2,myImg2,"AutoConvolve(Moffat)")
+
+    # Also check AutoConvolve with an asymmetric profile.
+    # (AutoCorrelate with this profile is done below...)
+    obj1 = galsim.Gaussian(sigma=3., flux=4)
+    obj1.applyShift(-0.2, -0.4)
+    obj2 = galsim.Gaussian(sigma=6., flux=1.3)
+    obj2.applyShift(0.3, 0.3)
+    add = galsim.Add(obj1, obj2)
+    conv = galsim.Convolve([add, add])
+    conv.draw(myImg1)
+    corr = galsim.AutoConvolve(add)
+    corr.draw(myImg2)
+    printval(myImg1, myImg2)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Asymmetric sum of Gaussians convolved with self disagrees with "+
+            "AutoConvolve result")
+
+    t2 = time.time()
+    print 'time for %s = %.2f'%(funcname(),t2-t1)
+
+
+def test_autocorrelate():
+    """Test that auto-correlation works the same as convolution with the mirror image of itself.
+
+    (See the Signal processing Section of http://en.wikipedia.org/wiki/Autocorrelation)
+    """
+    import time
+    t1 = time.time()
+    # Use a function that is NOT two-fold rotationally symmetric, e.g. two different flux Gaussians
+    myGauss1 = galsim.SBGaussian(sigma=3., flux=4)
+    myGauss1.applyShift(-0.2, -0.4)
+    myGauss2 = (galsim.SBGaussian(sigma=6., flux=1.3))
+    myGauss2.applyShift(0.3, 0.3)
+    mySBP1 = galsim.SBAdd([myGauss1, myGauss2])
+    mySBP2 = galsim.SBAdd([myGauss1, myGauss2])
+    # Here we rotate by 180 degrees to create mirror image
+    mySBP2.applyRotation(180. * galsim.degrees)
+    myConv = galsim.SBConvolve([mySBP1, mySBP2])
+    myImg1 = galsim.ImageF(80,80)
+    myImg1.setScale(0.7)
+    myConv.draw(myImg1.view())
+    myAutoCorr = galsim.SBAutoCorrelate(mySBP1)
+    myImg2 = galsim.ImageF(80,80)
+    myImg2.setScale(0.7)
+    myAutoCorr.draw(myImg2.view())
+    printval(myImg1, myImg2)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Asymmetric sum of Gaussians convolved with mirror of self disagrees with "+
+            "SBAutoCorrelate result")
+
+    # Repeat with the GSObject version of this:
+    obj1 = galsim.Gaussian(sigma=3., flux=4)
+    obj1.applyShift(-0.2, -0.4)
+    obj2 = galsim.Gaussian(sigma=6., flux=1.3)
+    obj2.applyShift(0.3, 0.3)
+    add1 = galsim.Add(obj1, obj2)
+    add2 = (galsim.Add(obj1, obj2)).createRotated(180. * galsim.degrees)
+    conv = galsim.Convolve([add1, add2])
+    conv.draw(myImg1)
+    corr = galsim.AutoCorrelate(add1)
+    corr.draw(myImg2)
+    printval(myImg1, myImg2)
+    np.testing.assert_array_almost_equal(
+            myImg1.array, myImg2.array, 4,
+            err_msg="Asymmetric sum of Gaussians convolved with mirror of self disagrees with "+
+            "AutoCorrelate result")
+
+    # Test photon shooting.
+    do_shoot(corr,myImg2,"AutoCorrelate")
+    t2 = time.time()
+    print 'time for %s = %.2f'%(funcname(),t2-t1)
+
 
 if __name__ == "__main__":
     test_gaussian()
@@ -2550,3 +2784,5 @@ if __name__ == "__main__":
     test_rescale()
     test_sbinterpolatedimage()
     test_draw()
+    test_autoconvolve()
+    test_autocorrelate()

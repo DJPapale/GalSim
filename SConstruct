@@ -61,8 +61,9 @@ opts = Variables(config_file)
 
 # Now set up options for the command line
 opts.Add('CXX','Name of c++ compiler')
-opts.Add('FLAGS','Compile flags to send to the compiler','')
-opts.Add('EXTRA_FLAGS','Extra flags to send to the compiler','')
+opts.Add('FLAGS','Compiler flags to send to use instead of the automatic ones','')
+opts.Add('EXTRA_FLAGS','Extra compiler flags to use in addition to automatic ones','')
+opts.Add('LINKFLAGS','Additional flags to use when linking','')
 opts.Add(BoolVariable('DEBUG','Turn on debugging statements',True))
 opts.Add(BoolVariable('EXTRA_DEBUG','Turn on extra debugging info',False))
 opts.Add(BoolVariable('WARN','Add warning compiler flags, like -Wall', True))
@@ -151,7 +152,7 @@ def ErrorExit(*args, **kwargs):
     """
     Whenever we get an error in the initial setup checking for the various
     libraries, compiler, etc., we don't want to cache the result.
-    On the other hand, if we delete the .scon* files now, then the aren't 
+    On the other hand, if we delete the .scon* files now, then they aren't 
     available to diagnose any problems.
     So we write a file called gs.error that
     a) includes some relevant information to diagnose the problem.
@@ -311,6 +312,10 @@ def BasicCCFlags(env):
         # If flags are specified as an option use them:
         cxx_flags = env['FLAGS'].split(' ')
         env.Replace(CCFLAGS=cxx_flags)
+        for flag in cxx_flags:
+            if flag.startswith('-Wl') or flag.startswith('-m'):
+                # Then this also needs to be in LINKFLAGS
+                env.AppendUnique(LINKFLAGS=flag)
 
     extra_flags = env['EXTRA_FLAGS'].split(' ')
     env.AppendUnique(CCFLAGS=extra_flags)
@@ -416,7 +421,7 @@ def which(program):
     return None
 
 def GetCompilerVersion(env):
-    """
+    """Determine the version of the compiler
     """
     if env['CXX'] is None:
         env['CXX'] = default_cxx
@@ -509,6 +514,18 @@ def GetCompilerVersion(env):
     env['CXXVERSION'] = version
     env['CXXVERSION_NUMERICAL'] = float(vnum)
 
+def GetNosetestsVersion(env):
+    """Determine the version of nosetests
+    """
+    import subprocess
+    cmd = env['NOSETESTS'] + ' --version 2>&1'
+    p = subprocess.Popen([cmd],stdout=subprocess.PIPE,shell=True)
+    line = p.stdout.readlines()[0]
+    version = line.split()[2]
+    print 'nosetests version:',version
+    env['NOSETESTSVERSION'] = version
+
+
 def ExpandPath(path):
     p=os.path.expanduser(path)
     p=os.path.expandvars(p)
@@ -552,7 +569,7 @@ def AddDepPaths(bin_paths,cpp_paths,lib_paths):
         tdir = FindPathInEnv(env, dirtag)
         if tdir is None:
             if env[dirtag] != '':
-                print 'Warning, could not find specified %s = %s'%(dirtag,env[dirtag])
+                print 'WARNING: could not find specified %s = %s'%(dirtag,env[dirtag])
             continue
 
         AddPath(bin_paths, os.path.join(tdir, 'bin'))
@@ -679,12 +696,15 @@ def TryRunResult(config,text,name):
     return ok
 
 
-def CheckLibsSimple(config,try_libs,source_file):
+def CheckLibsSimple(config,try_libs,source_file,prepend=True):
     init_libs = []
     if 'LIBS' in config.env._dict.keys():
         init_libs = config.env['LIBS']
 
-    config.env.PrependUnique(LIBS=try_libs)
+    if prepend:
+        config.env.PrependUnique(LIBS=try_libs)
+    else:
+        config.env.AppendUnique(LIBS=try_libs)
     result = TryRunResult(config,source_file,'.cpp')
 
     # If that didn't work, go back to the original LIBS
@@ -693,12 +713,15 @@ def CheckLibsSimple(config,try_libs,source_file):
     return result
  
 
-def CheckLibsFull(config,try_libs,source_file):
+def CheckLibsFull(config,try_libs,source_file,prepend=True):
     init_libs = []
     if 'LIBS' in config.env._dict.keys():
         init_libs = config.env['LIBS']
 
-    config.env.PrependUnique(LIBS=try_libs)
+    if prepend:
+        config.env.PrependUnique(LIBS=try_libs)
+    else:
+        config.env.AppendUnique(LIBS=try_libs)
     result = TryRunResult(config,source_file,'.cpp')
 
     # Sometimes we need to add a directory to RPATH, so try each one.
@@ -708,7 +731,10 @@ def CheckLibsFull(config,try_libs,source_file):
             init_rpath = config.env['RPATH']
 
         for rpath in config.env['LIBPATH']:
-            config.env.PrependUnique(RPATH=rpath)
+            if prepend:
+                config.env.PrependUnique(RPATH=rpath)
+            else:
+                config.env.AppendUnique(RPATH=rpath)
             result = TryRunResult(config,source_file,'.cpp')
             if result: 
                 break
@@ -717,7 +743,10 @@ def CheckLibsFull(config,try_libs,source_file):
 
         # If that doesn't work, also try adding all of them, just in case we need more than one.
         if not result :
-            config.env.PrependUnique(RPATH=config.env['LIBPATH'])
+            if prepend:
+                config.env.PrependUnique(RPATH=config.env['LIBPATH'])
+            else:
+                config.env.AppendUnique(RPATH=config.env['LIBPATH'])
             result = TryRunResult(config,source_file,'.cpp')
             if not result:
                 config.env.Replace(RPATH=init_rpath)
@@ -731,7 +760,10 @@ def CheckLibsFull(config,try_libs,source_file):
         library_path=os.environ['LIBRARY_PATH']
         library_path=library_path.split(os.pathsep)
         for rpath in library_path:
-            config.env.PrependUnique(RPATH=rpath)
+            if prepend:
+                config.env.PrependUnique(RPATH=rpath)
+            else:
+                config.env.AppendUnique(RPATH=rpath)
             result = TryRunResult(config,source_file,'.cpp')
             if result: 
                 break
@@ -740,7 +772,10 @@ def CheckLibsFull(config,try_libs,source_file):
 
         # If that doesn't work, also try adding all of them, just in case we need more than one.
         if not result :
-            config.env.PrependUnique(RPATH=library_path)
+            if prepend:
+                config.env.PrependUnique(RPATH=library_path)
+            else:
+                config.env.AppendUnique(RPATH=library_path)
             result = TryRunResult(config,source_file,'.cpp')
             if not result:
                 config.env.Replace(RPATH=init_rpath)
@@ -773,7 +808,10 @@ int main()
             'Error: fftw file failed to compile.',
             'Check that the correct location is specified for FFTW_DIR')
 
-    if not CheckLibsFull(config,['fftw3'],fftw_source_file):
+    result = (
+        CheckLibsFull(config,[''],fftw_source_file) or
+        CheckLibsFull(config,['fftw3'],fftw_source_file) )
+    if not result:
         ErrorExit(
             'Error: fftw file failed to link correctly',
             'Check that the correct location is specified for FFTW_DIR') 
@@ -807,6 +845,7 @@ int main()
             'Check that the correct location is specified for TMV_DIR')
 
     result = (
+        CheckLibsSimple(config,[''],tmv_source_file) or
         CheckLibsSimple(config,['tmv_symband','tmv'],tmv_source_file) or
         CheckLibsSimple(config,['tmv_symband','tmv','irc','imf'],tmv_source_file) or
         CheckLibsFull(config,['tmv_symband','tmv'],tmv_source_file) or
@@ -897,12 +936,15 @@ def TryModule(config,text,name,pyscript=""):
     return ok
 
 
-def CheckModuleLibs(config,try_libs,source_file,name):
+def CheckModuleLibs(config,try_libs,source_file,name,prepend=True):
     init_libs = []
     if 'LIBS' in config.env._dict.keys():
         init_libs = config.env['LIBS']
 
-    config.env.PrependUnique(LIBS=try_libs)
+    if prepend:
+        config.env.PrependUnique(LIBS=try_libs)
+    else:
+        config.env.AppendUnique(LIBS=try_libs)
     result = TryModule(config,source_file,name)
 
     # Sometimes we need to add a directory to RPATH, so try each one.
@@ -912,7 +954,10 @@ def CheckModuleLibs(config,try_libs,source_file,name):
             init_rpath = config.env['RPATH']
 
         for rpath in config.env['LIBPATH']:
-            config.env.PrependUnique(RPATH=rpath)
+            if prepend:
+                config.env.PrependUnique(RPATH=rpath)
+            else:
+                config.env.AppendUnique(RPATH=rpath)
             result = TryModule(config,source_file,name)
             if result: 
                 break
@@ -921,7 +966,10 @@ def CheckModuleLibs(config,try_libs,source_file,name):
 
         # If that doesn't work, also try adding all of them, just in case we need more than one.
         if not result :
-            config.env.PrependUnique(RPATH=config.env['LIBPATH'])
+            if prepend:
+                config.env.PrependUnique(RPATH=config.env['LIBPATH'])
+            else:
+                config.env.AppendUnique(RPATH=config.env['LIBPATH'])
             result = TryModule(config,source_file,name)
             if not result:
                 config.env.Replace(RPATH=init_rpath)
@@ -1091,12 +1139,12 @@ PyMODINIT_FUNC initcheck_tmv(void)
     # So if the first line fails, try adding a few mkl libraries that might make it work.
     result = (
         CheckModuleLibs(config,[],tmv_source_file,'check_tmv') or
-        CheckModuleLibs(config,['mkl_rt'],tmv_source_file,'check_tmv') or
-        CheckModuleLibs(config,['mkl_base'],tmv_source_file,'check_tmv') or
-        CheckModuleLibs(config,['mkl_mc3'],tmv_source_file,'check_tmv') or
-        CheckModuleLibs(config,['mkl_mc3','mkl_def'],tmv_source_file,'check_tmv') or
-        CheckModuleLibs(config,['mkl_mc'],tmv_source_file,'check_tmv') or
-        CheckModuleLibs(config,['mkl_mc','mkl_def'],tmv_source_file,'check_tmv') )
+        CheckModuleLibs(config,['mkl_rt'],tmv_source_file,'check_tmv',False) or
+        CheckModuleLibs(config,['mkl_base'],tmv_source_file,'check_tmv',False) or
+        CheckModuleLibs(config,['mkl_mc3'],tmv_source_file,'check_tmv',False) or
+        CheckModuleLibs(config,['mkl_mc3','mkl_def'],tmv_source_file,'check_tmv',False) or
+        CheckModuleLibs(config,['mkl_mc'],tmv_source_file,'check_tmv',False) or
+        CheckModuleLibs(config,['mkl_mc','mkl_def'],tmv_source_file,'check_tmv'),False)
     if not result:
         ErrorExit('Unable to build a python loadable module that uses tmv')
    
@@ -1364,6 +1412,24 @@ def DoCppChecks(config):
         ErrorExit('Could not open TMV link file: ',tmv_link_file)
     print '    ',tmv_link
 
+    if sys.platform.find('darwin') != -1:
+        # The Mac BLAS library is notoriously sketchy.  In particular, we have discovered that it
+        # is thread-unsafe for Mac OS 10.7.  Try to give an appropriate warning if we can tell that 
+        # this is what the TMV library is using.
+        import platform
+        print 'Mac version is ',platform.mac_ver()[0]
+        if (platform.mac_ver()[0] >= '10.7' and '-latlas' not in tmv_link and
+            ('-lblas' in tmv_link or '-lcblas' in tmv_link)):
+            print 'WARNING: The Apple BLAS library has been found not to be thread safe on'
+            print '         Mac OS version 10.7 (and possibly higher), even across multiple'
+            print '         processes (i.e. not just multiple threads in the same process).'
+            print '         The symptom is that `scons tests` will hang when running nosetests'
+            print '         using multiple processes.'
+            print '         If this occurrs, the solution is to compile TMV either with a '
+            print '         different BLAS library (e.g. ATLAS) or with no BLAS library at '
+            print '         all (using WITH_BLAS=false).'
+            env['BAD_BLAS'] = True
+
     # ParseFlags doesn't know about -fopenmp being a LINKFLAG, so it
     # puts it into CCFLAGS instead.  Move it over to LINKFLAGS before
     # merging everything.
@@ -1601,12 +1667,14 @@ if not GetOption('help'):
                 env['NOSETESTS'] = None
             else:
                 env['NOSETESTS'] = nosetests
+        if env['NOSETESTS']:
+            GetNosetestsVersion(env)
         subdirs += ['tests']
 
     if env['WITH_UPS']:
        subdirs += ['ups']
 
-    # subdirectores to process.  We process src and pysrc by default
+    # subdirectories to process.  We process src and pysrc by default
     script_files = []
     for d in subdirs:
         script_files.append(os.path.join(d,'SConscript'))

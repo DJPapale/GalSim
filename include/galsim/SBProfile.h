@@ -72,7 +72,8 @@ namespace galsim {
          *                            have made lead to errors greater than this.  But whenever we 
          *                            do an explicit calculation about this, this is the value we 
          *                            use.  
-         *                            This would typically be more stringent than maxk_threshold.
+         *                            This should typically be set to a lower, more stringent value
+         *                            than maxk_threshold.
          * @param xvalue_accuracy     Accuracy of values in real space.
          *                            If a value in real space is less than xvalue_accuracy, then 
          *                            it may be set to zero.  Similarly, if an alternate 
@@ -95,8 +96,8 @@ namespace galsim {
                  int _maximum_fft_size,
                  double _alias_threshold,
                  double _maxk_threshold,
-                 double _xvalue_accuracy,
                  double _kvalue_accuracy,
+                 double _xvalue_accuracy,
                  double _shoot_accuracy,
                  double _realspace_relerr,
                  double _realspace_abserr,
@@ -135,20 +136,20 @@ namespace galsim {
             {}
 
         // These are all public.  So you access them just as member values.
-        const int minimum_fft_size;
-        const int maximum_fft_size;
+        int minimum_fft_size;
+        int maximum_fft_size;
 
-        const double alias_threshold;
-        const double maxk_threshold;
+        double alias_threshold;
+        double maxk_threshold;
 
-        const double kvalue_accuracy;
-        const double xvalue_accuracy;
-        const double shoot_accuracy;
+        double kvalue_accuracy;
+        double xvalue_accuracy;
+        double shoot_accuracy;
 
-        const double realspace_relerr;
-        const double realspace_abserr;
-        const double integration_relerr;
-        const double integration_abserr;
+        double realspace_relerr;
+        double realspace_abserr;
+        double integration_relerr;
+        double integration_abserr;
     };
 
     // All code between the @cond and @endcond is excluded from Doxygen documentation

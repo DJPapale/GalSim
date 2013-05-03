@@ -32,13 +32,10 @@ namespace galsim {
 
         static bp::object GetArrayImpl(bp::object self, bool isConst) 
         {
-            // --- Try to get cached array ---
-            if (PyObject_HasAttrString(self.ptr(), "_array")) return self.attr("_array");
             const LVector& lvector = bp::extract<const LVector&>(self);
             bp::object numpy_array = MakeNumpyArray(
                 lvector.rVector().cptr(), lvector.size(), lvector.rVector().step(), isConst,
                 lvector.getOwner());
-            self.attr("_array") = numpy_array;
             return numpy_array;
         }
 
@@ -119,8 +116,9 @@ namespace galsim {
 
         static void wrap() {
             bp::class_<SBShapelet,bp::bases<SBProfile> >("SBShapelet", bp::no_init)
-                .def(bp::init<double,LVector>(
-                        (bp::arg("sigma"), bp::arg("bvec")))
+                .def(bp::init<double,LVector,boost::shared_ptr<GSParams> >(
+                        (bp::arg("sigma"), bp::arg("bvec"),
+                         bp::arg("gsparams")=bp::object()))
                 )
                 .def(bp::init<const SBShapelet &>())
                 .def("getSigma", &SBShapelet::getSigma)

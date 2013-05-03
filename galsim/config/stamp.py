@@ -21,7 +21,7 @@ import time
 import galsim
 
 
-def BuildStamps(nobjects, config, xsize, ysize, 
+def BuildStamps(nobjects, config, xsize=0, ysize=0, 
                 obj_num=0, nproc=1, sky_level_pixel=None, do_noise=True, logger=None,
                 make_psf_image=False, make_weight_image=False, make_badpix_image=False):
     """
@@ -30,7 +30,11 @@ def BuildStamps(nobjects, config, xsize, ysize,
     @param nobjects            How many postage stamps to build.
     @param config              A configuration dict.
     @param xsize               The size of a single stamp in the x direction.
+                               (If 0, look for config.image.stamp_xsize, and if that's
+                                not there, use automatic sizing.)
     @param ysize               The size of a single stamp in the y direction.
+                               (If 0, look for config.image.stamp_ysize, and if that's
+                                not there, use automatic sizing.)
     @param obj_num             If given, the current obj_num (default = 0)
     @param nproc               How many processes to use.
     @param sky_level_pixel     The background sky level to add to the image (in ADU/pixel).
@@ -88,8 +92,11 @@ def BuildStamps(nobjects, config, xsize, ysize,
             if logger:
                 logger.info("ncpu = %d.  Using %d processes",ncpu,nproc)
         except:
-            raise AttributeError(
-                "config.image.nproc <= 0, but unable to determine number of cpus.")
+            if logger:
+                logger.warn("config.image.nproc <= 0, but unable to determine number of cpus.")
+            nproc = 1
+            if logger:
+                logger.info("Unable to determine ncpu.  Using %d processes",nproc)
     
     if nproc > 1:
         from multiprocessing import Process, Queue, current_process
@@ -208,15 +215,15 @@ def BuildStamps(nobjects, config, xsize, ysize,
     return images, psf_images, weight_images, badpix_images
  
 
-def BuildSingleStamp(config, xsize, ysize,
+def BuildSingleStamp(config, xsize=0, ysize=0,
                      obj_num=0, sky_level_pixel=None, do_noise=True, logger=None,
                      make_psf_image=False, make_weight_image=False, make_badpix_image=False):
     """
     Build a single image using the given config file
 
     @param config              A configuration dict.
-    @param xsize               The xsize of the image to build.
-    @param ysize               The ysize of the image to build.
+    @param xsize               The xsize of the image to build (if known).
+    @param ysize               The ysize of the image to build (if known).
     @param obj_num             If given, the current obj_num (default = 0)
     @param sky_level_pixel     The background sky level to add to the image (in ADU/pixel).
     @param do_noise            Whether to add noise to the image (according to config['noise']).
@@ -242,37 +249,85 @@ def BuildSingleStamp(config, xsize, ysize,
     if 'gd' in config:
         del config['gd']  # In case it was set.
 
+    # Determine the size of this stamp
+    if not xsize:
+        if 'stamp_xsize' in config['image']:
+            xsize = galsim.config.ParseValue(config['image'],'stamp_xsize',config,int)[0]
+        elif 'stamp_size' in config['image']:
+            xsize = galsim.config.ParseValue(config['image'],'stamp_size',config,int)[0]
+    if not ysize:
+        if 'stamp_ysize' in config['image']:
+            ysize = galsim.config.ParseValue(config['image'],'stamp_ysize',config,int)[0]
+        elif 'stamp_size' in config['image']:
+            ysize = galsim.config.ParseValue(config['image'],'stamp_size',config,int)[0]
+
     # Determine where this object is going to go:
-    if 'center' in config['image']:
+    if 'image_pos' in config['image']:
         import math
-        center = galsim.config.ParseValue(config['image'],'center',config,galsim.PositionD)[0]
-        #print 'center = ',center
-        icenter = galsim.PositionI(
-            int(math.floor(center.x+0.5)),
-            int(math.floor(center.y+0.5)) )
-        #print 'icenter = ',icenter
-        final_shift = galsim.PositionD(center.x-icenter.x , center.y-icenter.y)
-        #print 'final_shift = ',final_shift
+        image_pos = galsim.config.ParseValue(config['image'],'image_pos',config,
+                                             galsim.PositionD)[0]
+        # Save this value for possible use in Eval's.
+        config['image_pos'] = image_pos
+        #print 'image_pos = ',image_pos
+
         # Calculate and save the position relative to the image center
-        config['chip_pos'] = center
-        config['pos'] = (center - config['image_cen']) * config['pixel_scale']
-        #print 'pos = ',config['pos']
+        config['sky_pos'] = (image_pos - config['image_cen']) * config['pixel_scale']
+        #print 'sky_pos = ',config['sky_pos']
+
+    elif 'sky_pos' in config['image']:
+        import math
+        sky_pos = galsim.config.ParseValue(config['image'],'sky_pos',config,
+                                           galsim.PositionD)[0]
+        # Save this value for possible use in Eval's.
+        config['sky_pos'] = sky_pos
+        #print 'sky_pos = ',sky_pos
+
+        # Calculate and save the position relative to the image center
+        image_pos = (sky_pos / config['pixel_scale']) + config['image_cen']
+        config['image_pos'] = image_pos
+        #print 'image_pos = ',config['image_pos']
+
     else:
-        center = None
+        image_pos = None
+
+
+    if image_pos is not None:
+        # The image_pos refers to the location of the true center of the image, which is not 
+        # necessarily the nominal center we need for adding to the final image.  In particular,
+        # even-sized images have their nominal center offset by 1/2 pixel up and to the right.
+        # N.B. This works even if xsize,ysize == 0, since the auto-sizing always produces
+        # even sized images.
+        if xsize % 2 == 0: image_pos.x += 0.5
+        if ysize % 2 == 0: image_pos.y += 0.5
+        #print 'nominal image_pos = ',image_pos
+
+        icenter = galsim.PositionI(
+            int(math.floor(image_pos.x+0.5)),
+            int(math.floor(image_pos.y+0.5)) )
+        #print 'icenter = ',icenter
+        final_shift = galsim.PositionD(image_pos.x-icenter.x , image_pos.y-icenter.y)
+        #print 'final_shift = ',final_shift
+
+    else:
         icenter = None
         final_shift = None
+
+    gsparams = {}
+    if 'gsparams' in config['image']:
+        gsparams = galsim.config.UpdateGSParams(
+            gsparams, config['image']['gsparams'], 'gsparams', config)
 
     skip = False
     try :
         t4=t3=t2=t1  # in case we throw.
 
-        psf = BuildPSF(config,logger)
+        psf = BuildPSF(config,logger,gsparams)
         t2 = time.time()
 
-        pix = BuildPix(config,logger)
+        pix = BuildPix(config,logger,gsparams)
         t3 = time.time()
 
-        gal = BuildGal(config,logger)
+        gal = BuildGal(config,logger,gsparams)
         t4 = time.time()
 
         # Check that we have at least gal or psf.
@@ -291,10 +346,11 @@ def BuildSingleStamp(config, xsize, ysize,
 
     draw_method = galsim.config.ParseValue(config['image'],'draw_method',config,str)[0]
     if skip: 
-        if xsize:
+        if xsize and ysize:
             im = galsim.ImageF(xsize, ysize)
         else:
             im = galsim.ImageF(1,1)
+        im.setOrigin(config['image_origin'])
         im.setScale(im.scale)
         im.setZero()
         if do_noise and sky_level_pixel:
@@ -363,7 +419,7 @@ def BuildSingleStamp(config, xsize, ysize,
     return im, psf_im, weight_im, badpix_im, t6-t1
 
 
-def BuildPSF(config, logger=None):
+def BuildPSF(config, logger=None, gsparams={}):
     """
     Parse the field config['psf'] returning the built psf object.
     """
@@ -371,13 +427,13 @@ def BuildPSF(config, logger=None):
     if 'psf' in config:
         if not isinstance(config['psf'], dict):
             raise AttributeError("config.psf is not a dict.")
-        psf = galsim.config.BuildGSObject(config, 'psf')[0]
+        psf = galsim.config.BuildGSObject(config, 'psf', config, gsparams)[0]
     else:
         psf = None
 
     return psf
 
-def BuildPix(config, logger=None):
+def BuildPix(config, logger=None, gsparams={}):
     """
     Parse the field config['pix'] returning the built pix object.
     """
@@ -385,14 +441,14 @@ def BuildPix(config, logger=None):
     if 'pix' in config: 
         if not isinstance(config['pix'], dict):
             raise AttributeError("config.pix is not a dict.")
-        pix = galsim.config.BuildGSObject(config, 'pix')[0]
+        pix = galsim.config.BuildGSObject(config, 'pix', config, gsparams)[0]
     else:
         pix = None
 
     return pix
 
 
-def BuildGal(config, logger=None):
+def BuildGal(config, logger=None, gsparams={}):
     """
     Parse the field config['gal'] returning the built gal object.
     """
@@ -400,7 +456,7 @@ def BuildGal(config, logger=None):
     if 'gal' in config:
         if not isinstance(config['gal'], dict):
             raise AttributeError("config.gal is not a dict.")
-        gal = galsim.config.BuildGSObject(config, 'gal')[0]
+        gal = galsim.config.BuildGSObject(config, 'gal', config, gsparams)[0]
     else:
         gal = None
     return gal
@@ -437,8 +493,13 @@ def DrawStampFFT(psf, pix, gal, config, xsize, ysize, sky_level_pixel, final_shi
     else:
         pixel_scale = 1.0
 
+    if 'image' in config and 'wmult' in config['image']:
+        wmult = galsim.config.ParseValue(config['image'], 'wmult', config, float)[0]
+    else:
+        wmult = 1.0
+
     if final_shift:
-        #print 'shift = ',final_shift.x*pixel_scale, final_shift.y*pixel_scale
+        #print 'shift = ',final_shift*pixel_scale
         final.applyShift(final_shift.x*pixel_scale, final_shift.y*pixel_scale)
 
     if xsize:
@@ -446,7 +507,8 @@ def DrawStampFFT(psf, pix, gal, config, xsize, ysize, sky_level_pixel, final_shi
     else:
         im = None
 
-    im = final.draw(image=im, dx=pixel_scale)
+    im = final.draw(image=im, dx=pixel_scale, wmult=wmult)
+    im.setOrigin(config['image_origin'])
 
     if 'gal' in config and 'signal_to_noise' in config['gal']:
         import math
@@ -609,19 +671,17 @@ def AddNoiseFFT(im, weight_im, noise, base, rng, sky_level_pixel, logger=None):
         
         kwargs = galsim.config.GetAllParams(noise, 'noise', base, req=req, opt=opt)[0]
 
-        # Build the cf first (TODO: change this, see below)
-        cf = galsim.correlatednoise.get_COSMOS_CorrFunc(**kwargs)
-        # TODO: Harmonize the usage below with the other noise application methods once the CorrFunc
-        # becomes a Noise class instance and can be used directly with the im.addNoise method
-        cf.applyNoiseTo(im, dev=rng)
+        # Build the correlated noise 
+        cn = galsim.correlatednoise.getCOSMOSNoise(rng, **kwargs)
+        im.addNoise(cn)
 
         # Then add the variance to the weight image, using the zero-lag correlation function value
         if weight_im:
-            weight_im += cf._profile.xValue(galsim.PositionD(0., 0.))
+            weight_im += cn.getVariance()
         if logger:
             logger.debug(
                 '   Added COSMOS correlated noise with variance = %f',
-                cf._profile.xValue(galsim.PositionD(0., 0.)))
+                cn.getVariance())
 
     else:
         raise AttributeError("Invalid type %s for noise"%type)
@@ -659,32 +719,48 @@ def DrawStampPhot(psf, gal, config, xsize, ysize, rng, sky_level_pixel, final_sh
     else:
         pixel_scale = 1.0
 
-    if 'image' in config and 'max_extra_noise' in config['image']:
-        max_extra_noise = galsim.config.ParseValue(
-                config['image'], 'max_extra_noise', config, float)[0]
-    else:
-        max_extra_noise = 0.01
-
-    if max_extra_noise < 0.:
-        raise ValueError("image.max_extra_noise cannot be negative")
-
-    if max_extra_noise > 0.:
-        if 'image' in config and 'noise' in config['image']:
-            noise_var = CalculateNoiseVar(config['image']['noise'], config, pixel_scale, 
-                                          sky_level_pixel)
-        else:
-            raise AttributeError(
-                "Need to specify noise level when using draw_method = phot")
-        if noise_var < 0.:
-            raise ValueError("noise_var calculated to be < 0.")
-        max_extra_noise *= noise_var
-
     if xsize:
         im = galsim.ImageF(xsize, ysize)
     else:
         im = None
 
-    im = final.drawShoot(image=im, dx=pixel_scale, max_extra_noise=max_extra_noise, rng=rng)
+    if 'image' in config and 'n_photons' in config['image']:
+
+        if 'max_extra_noise' in config['image']:
+            import warnings
+            warnings.warn(
+                "Both 'max_extra_noise' and 'n_photons' are set in config['image'], "+
+                "ignoring 'max_extra_noise'.")
+
+        n_photons = galsim.config.ParseValue(
+            config['image'], 'n_photons', config, int)[0]
+        im = final.drawShoot(image=im, dx=pixel_scale, n_photons=n_photons, rng=rng)
+        im.setOrigin(config['image_origin'])
+
+    else:
+
+        if 'image' in config and 'max_extra_noise' in config['image']:
+            max_extra_noise = galsim.config.ParseValue(
+                config['image'], 'max_extra_noise', config, float)[0]
+        else:
+            max_extra_noise = 0.01
+
+        if max_extra_noise < 0.:
+            raise ValueError("image.max_extra_noise cannot be negative")
+
+        if max_extra_noise > 0.:
+            if 'image' in config and 'noise' in config['image']:
+                noise_var = CalculateNoiseVar(config['image']['noise'], config, pixel_scale, 
+                                              sky_level_pixel)
+            else:
+                raise AttributeError(
+                    "Need to specify noise level when using draw_method = phot")
+            if noise_var < 0.:
+                raise ValueError("noise_var calculated to be < 0.")
+            max_extra_noise *= noise_var
+
+        im = final.drawShoot(image=im, dx=pixel_scale, max_extra_noise=max_extra_noise, rng=rng)
+        im.setOrigin(config['image_origin'])
 
     return im
     
@@ -807,19 +883,17 @@ def AddNoisePhot(im, weight_im, noise, base, rng, sky_level_pixel, logger=None):
         
         kwargs = galsim.config.GetAllParams(noise, 'noise', base, req=req, opt=opt)[0]
 
-        # Build the cf first (TODO: change this, see below)
-        cf = galsim.correlatednoise.get_COSMOS_CorrFunc(**kwargs)
-        # TODO: Harmonize the usage below with the other noise application methods once the CorrFunc
-        # becomes a Noise class instance and can be used directly with the im.addNoise method
-        cf.applyNoiseTo(im, dev=rng)
+        # Build and add the correlated noise 
+        cn = galsim.correlatednoise.getCOSMOSNoise(rng, **kwargs)
+        im.addNoise(cn)
 
         # Then add the variance to the weight image, using the zero-lag correlation function value
         if weight_im:
-            weight_im += cf._profile.xValue(galsim.PositionD(0., 0.))
+            weight_im += cn.getVariance()
         if logger:
             logger.debug(
                 '   Added COSMOS correlated noise with variance = %f',
-                cf._profile.xValue(galsim.PositionD(0., 0.)))
+                cn.getVariance())
 
     else:
         raise AttributeError("Invalid type %s for noise",type)
@@ -960,11 +1034,14 @@ def CalculateNoiseVar(noise, base, pixel_scale, sky_level_pixel):
         
         kwargs = galsim.config.GetAllParams(noise, 'noise', base, req=req, opt=opt)[0]
 
-        # Build the cf first (TODO: change this)
-        cf = galsim.correlatednoise.get_COSMOS_CorrFunc(**kwargs)
+        # Build and add the correlated noise (lets the cn internals handle dealing with the options
+        # for default variance: quick and ensures we don't needlessly duplicate code) 
+        # Note: the rng being passed here is arbitrary, since we don't need it to calculate the
+        # variance.  Building a BaseDeviate with a particular seed is the fastest option.
+        cn = galsim.correlatednoise.getCOSMOSNoise(galsim.BaseDeviate(123), **kwargs)
+
         # zero distance correlation function value returned as variance
-        # TODO: Use getVariance once CorrFunc is a Noise sub-class
-        var = cf._profile.xValue(galsim.PositionD(0., 0.))
+        var = cn.getVariance()
 
     else:
         raise AttributeError("Invalid type %s for noise",type)
