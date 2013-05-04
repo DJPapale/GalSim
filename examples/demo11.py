@@ -25,8 +25,9 @@ New features introduced in this demo:
 - ps = galsim.PowerSpectrum(..., units)
 - distdev = galsim.DistDeviate(rng, function, x_min, x_max)
 - gal.applyLensing(g1, g2, mu)
-- cf = galsim.correlatednoise.get_COSMOS_CorrFunc(file_name, ...)
-- cf.applyNoiseTo(image, ...)
+- cn = galsim.correlatednoise.getCOSMOSNoise(rng, file_name, ...)
+- image.addNoise(cn)
+- image.setOrigin(x,y)
 
 - Power spectrum shears and magnifications for non-gridded positions.
 - Reading a compressed FITS image (using BZip2 compression).
@@ -145,8 +146,16 @@ def main(argv):
     # Setup the image:
     full_image = galsim.ImageF(image_size, image_size)
     full_image.setScale(pixel_scale)
-    cenx = ceny = image_size/2 + 1
-    center = galsim.PositionD(cenx,ceny) * pixel_scale
+
+    # The default convention for indexing an image is to follow the FITS standard where the 
+    # lower-left pixel is called (1,1).  However, this can be counter-intuitive to people more 
+    # used to C or python indexing, where indices start at 0.  It is possible to change the 
+    # coordinates of the lower-left pixel with the methods `setOrigin`.  For this demo, we
+    # switch to 0-based indexing, so the lower-left pixel will be called (0,0).
+    full_image.setOrigin(0,0)
+
+    # Get the center of the image in arcsec
+    center = full_image.bounds.trueCenter() * pixel_scale
 
     # As for demo10, we use random_seed+nobj for the random numbers required for the 
     # whole image.  In this case, both the power spectrum realization and the noise on the 
@@ -160,8 +169,7 @@ def main(argv):
     # represented exactly).  Lensing engine wants positions in arcsec, so calculate that:
     ps.buildGrid(grid_spacing = grid_spacing,
                  ngrid = int(image_size_arcsec / grid_spacing)+1,
-                 center = center,
-                 rng = rng)
+                 center = center, rng = rng)
     logger.info('Made gridded shears')
 
     # Now we need to loop over our objects:
@@ -170,9 +178,9 @@ def main(argv):
         # The usual random number generator using a different seed for each galaxy.
         ud = galsim.UniformDeviate(random_seed+k)
 
-        # Choose a random position within a range that is not too close to the edge.
-        x = 0.5*stamp_size + ud()*(image_size - stamp_size)
-        y = 0.5*stamp_size + ud()*(image_size - stamp_size)
+        # Choose a random position in the image
+        x = ud()*(image_size-1)
+        y = ud()*(image_size-1)
 
         # Turn this into a position in arcsec
         pos = galsim.PositionD(x,y) * pixel_scale
@@ -209,9 +217,11 @@ def main(argv):
         final = galsim.Convolve(psf, gal)
 
         # Account for the fractional part of the position:
-        ix = int(math.floor(x+0.5))
-        iy = int(math.floor(y+0.5))
-        final.applyShift((x-ix)*pixel_scale,(y-iy)*pixel_scale)
+        x_nom = x+0.5 # Because stamp size is even!  See discussion in demo9.py
+        y_nom = y+0.5
+        ix_nom = int(math.floor(x_nom+0.5))
+        iy_nom = int(math.floor(y_nom+0.5))
+        final.applyShift((x_nom-ix_nom)*pixel_scale,(y_nom-iy_nom)*pixel_scale)
 
         # Draw it with our desired stamp size
         stamp = galsim.ImageF(stamp_size,stamp_size)
@@ -226,7 +236,7 @@ def main(argv):
         stamp *= flux_scaling
 
         # Recenter the stamp at the desired position:
-        stamp.setCenter(ix,iy)
+        stamp.setCenter(ix_nom,iy_nom)
 
         # Find the overlapping bounds:
         bounds = stamp.bounds & full_image.bounds
@@ -237,7 +247,7 @@ def main(argv):
         logger.info('Galaxy %d: position relative to corner = %s, t=%f s', k, str(pos), tot_time)
 
     # Add correlated noise to the image -- the correlation function comes from the HST COSMOS images
-    # and is described in more detail in the galsim.correlatednoise.get_COSMOS_CorrFunc() docstring.
+    # and is described in more detail in the galsim.correlatednoise.getCOSMOSNoise() docstring.
     # This function requires a FITS file, stored in the GalSim repository, that represents this
     # correlation information: the path to this file is a required argument. 
     cf_file_name = os.path.join('..', 'examples', 'data', 'acs_I_unrot_sci_20_cf.fits')
@@ -248,13 +258,13 @@ def main(argv):
     # COSMOS.  Using the original pixel scale, dx_cosmos=0.03 [arcsec], would leave very little
     # correlation among our larger 0.2 arcsec pixels. We also set the point (zero-distance) variance
     # to our desired value.
-    cf = galsim.correlatednoise.get_COSMOS_CorrFunc(
-        cf_file_name, dx_cosmos=pixel_scale, variance=noise_variance)
+    cn = galsim.correlatednoise.getCOSMOSNoise(
+        rng, cf_file_name, dx_cosmos=pixel_scale, variance=noise_variance)
 
     # Now add noise according to this correlation function to the full_image.  We have to do this
     # step at the end, rather than adding to individual postage stamps, in order to get the noise
     # level right in the overlap regions between postage stamps.
-    cf.applyNoiseTo(full_image, dx=pixel_scale, dev=rng)
+    full_image.addNoise(cn) # Note image must have the right scale [set by setScale()], as here
     logger.info('Added noise to final large image')
 
     # Now write the image to disk.  It is automatically compressed with Rice compression,

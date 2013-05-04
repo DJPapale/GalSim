@@ -30,50 +30,49 @@ def _convertPositions(pos, units, func):
        This is used by the functions getShear, getConvergence, getMagnification, and getLensing for
        both PowerSpectrum and NFWHalo.
     """
-    try:
-        # Check for PositionD or PositionI:
-        if isinstance(pos,galsim.PositionD) or isinstance(pos,galsim.PositionI):
-            pos = ( np.array([pos.x], dtype='float'),
-                    np.array([pos.y], dtype='float') )
+    # Check for PositionD or PositionI:
+    if isinstance(pos,galsim.PositionD) or isinstance(pos,galsim.PositionI):
+        pos = [ np.array([pos.x], dtype='float'),
+                np.array([pos.y], dtype='float') ]
 
-        # Check for list of PositionD or PositionI:
-        # The only other options allow pos[0], so if this is invalid, an exception 
-        # will be raised and appropriately dealt with:
-        elif isinstance(pos[0],galsim.PositionD) or isinstance(pos[0],galsim.PositionI):
-            pos = ( np.array([p.x for p in pos], dtype='float'),
-                    np.array([p.y for p in pos], dtype='float') )
+    # Check for list of PositionD or PositionI:
+    # The only other options allow pos[0], so if this is invalid, an exception 
+    # will be raised:
+    elif isinstance(pos[0],galsim.PositionD) or isinstance(pos[0],galsim.PositionI):
+        pos = [ np.array([p.x for p in pos], dtype='float'),
+                np.array([p.y for p in pos], dtype='float') ]
 
-        # Now pos must be a tuple of length 2
-        elif len(pos) != 2:
-            raise TypeError() # This will be caught below and raised with a better error msg.
-
-        else:
-            # Check for (x,y):
-            try:
-                pos = ( np.array([float(pos[0])], dtype='float'),
-                        np.array([float(pos[1])], dtype='float') )
-            except:
-                # Only other valid option is ( xlist , ylist )
-                pos = ( np.array(pos[0], dtype='float'),
-                        np.array(pos[1], dtype='float') )
-
-        # Check validity of units
-        if isinstance(units, basestring):
-            # if the string is invalid, this raises a reasonable error message.
-            units = galsim.angle.get_angle_unit(units)
-        if not isinstance(units, galsim.AngleUnit):
-            raise ValueError("units must be either an AngleUnit or a string")
-
-        # Convert pos to arcsec
-        if units != galsim.arcsec:
-            scale = 1. * units / galsim.arcsec
-            pos[0] *= scale
-            pos[1] *= scale
-
-        return pos
-
-    except:
+    # Now pos must be a tuple of length 2
+    elif len(pos) != 2:
         raise TypeError("Unable to parse the input pos argument for %s."%func)
+
+    else:
+        # Check for (x,y):
+        try:
+            pos = [ np.array([float(pos[0])], dtype='float'),
+                    np.array([float(pos[1])], dtype='float') ]
+        except:
+            # Only other valid option is ( xlist , ylist )
+            pos = [ np.array(pos[0], dtype='float'),
+                    np.array(pos[1], dtype='float') ]
+
+    # Check validity of units
+    if isinstance(units, basestring):
+        # if the string is invalid, this raises a reasonable error message.
+        units = galsim.angle.get_angle_unit(units)
+    if not isinstance(units, galsim.AngleUnit):
+        raise ValueError("units must be either an AngleUnit or a string")
+
+    # Convert pos to arcsec
+    if units != galsim.arcsec:
+        scale = 1. * units / galsim.arcsec
+        # Note that for the next two lines, pos *must* be a list, not a tuple.  Assignments to
+        # elements of tuples is not allowed.
+        pos[0] *= scale
+        pos[1] *= scale
+
+    return pos
+
 
 def theoryToObserved(gamma1, gamma2, kappa):
     """Helper function to convert theoretical lensing quantities to observed ones.
@@ -129,9 +128,10 @@ class PowerSpectrum(object):
 
     A PowerSpectrum represents some (flat-sky) shear power spectrum, either for gridded points or at
     arbitary positions.  This class is originally initialized with a power spectrum from which we
-    would like to generate g1 and g2 (and, optionally, convergence kappa) values.  It generates shears
-    on a grid, and if necessary, when getShear is called, it will interpolate to the requested
-    positions.
+    would like to generate g1 and g2 (and, optionally, convergence kappa) values.  It generates
+    shears on a grid, and if necessary, when getShear is called, it will interpolate to the
+    requested positions.  For detail on how these processes are carried out, please see the document
+    in the GalSim repository, devel/modules/lensing_engine.pdf.
 
     When creating a PowerSpectrum instance, you need to specify at least one of the E or B mode 
     power spectra, which is normally given as a function P(k).  The typical thing is to just 
@@ -153,15 +153,24 @@ class PowerSpectrum(object):
     approach, which means that we implicitly assume our discrete representation of P(k) on a grid is
     one complete cell in an infinite periodic series.  We are making assumptions about what P(k) is
     doing outside of our minimum and maximum k range, and those must be kept in mind when comparing
-    with theoretical expectations.  Furthermore, the shear generation currently does not include
-    sample variance due to coverage of a finite patch.  In other words, we explicitly enforce
-    `P(k=0)=0`, which is true for the full sky in any reasonable cosmological model, but it ignores
-    the fact that our little patch of sky might reasonably live in some special region with respect
-    to shear correlations.  Our `P(k=0)=0` is essentially setting the integrated power below our
-    minimum k value to zero (i.e., it's implicitly a statement about power in a k range, not just at
-    `k=0` itself).  Future versions of the lensing engine may change this behavior.  Moreover, a
-    full comparison of the GalSim power spectrum normalization conventions and behavior in various
-    regimes is in the works and will be available with a future version of GalSim.
+    with theoretical expectations.
+
+    Specifically, since the power spectrum is realized on only a finite grid it has been been
+    effectively bandpass filtered between a minimum and maximum k value in each of the k1, k2
+    directions.  This filter is hard: beyond the minimum and maximum k range the P(k) is set to
+    zero.  See the buildGrid method for more information.
+
+    Therefore, the shear generation currently does not include sample variance due to coverage of a
+    finite patch.  We explicitly enforce `P(k=0)=0`, which is true for the full sky in a reasonable
+    cosmological model, but it ignores the fact that our little patch of sky might reasonably live
+    in some special region with respect to shear correlations.  Our `P(k=0)=0` is essentially 
+    setting the integrated power below our minimum k value to zero (i.e., it's implicitly a
+    statement about power in a k range, not just at `k=0` itself).  The implications of the discrete
+    representation, and the `P(k=0)=0` choice, are discussed in more detail in 
+    devel/modules/lensing_engine.pdf.
+
+    Therefore, since the power spectrum is realized on a finite grid, it has been been effectively
+    bandpass filtered between a minimum and maximum k value in each of the k1, k2 directions.
 
     The power functions must return a list/array that is the same size as what it was given, e.g.,
     in the case of no power or constant power, a function that just returns a float would not be
@@ -264,9 +273,35 @@ class PowerSpectrum(object):
         after buildGrid, or can use a convenience function that is part of galsim.lensing to convert
         from theoretical to observed quantities.
 
-        Note that the convention for axis orientation differs from that for the GREAT10 challenge,
-        so when using codes that deal with GREAT10 challenge outputs, the sign of our g2 shear
-        component must be flipped.
+        Note that the shears generated using this method correspond to the PowerSpectrum multiplied
+        by a sharp bandpass filter, set by the dimensions of the grid.
+
+        The filter sets `P(k)` = 0 for
+
+            |k1|, |k2| < kmin / 2
+
+        and
+            |k1|, |k2| > kmax + kmin / 2
+
+        where
+            kmin = 2. * pi / (ngrid * grid_spacing)
+            kmax = pi / grid_spacing
+
+        and where we have adopted the convention that grid points at a given `k` represent the
+        interval between `k - Delta k` and `k + Delta k` (noting that the grid spacing `Delta k` in
+        k space is equivalent to `kmin`).
+
+        It is worth remembering that this bandpass filter will *not* look like a circular annulus
+        in 2D k space, but is rather more like a thick-sided picture frame, having a small square
+        central cutout of dimensions `kmin` by `kmin`.  These properties are visible in the shears
+        generated by this method. 
+
+        For more information on the effects of finite grid representation of the power spectrum 
+        see `devel/modules/lensing_engine.pdf`.
+
+        Note also that the convention for axis orientation differs from that for the GREAT10
+        challenge, so when using codes that deal with GREAT10 challenge outputs, the sign of our g2
+        shear component must be flipped.
 
         Some examples:
 
@@ -337,10 +372,7 @@ class PowerSpectrum(object):
             raise ValueError("Both a spacing and a size are required for buildGrid.")
         # Check for non-integer ngrid
         if not isinstance(ngrid, int):
-            try:
-                ngrid = int(ngrid)
-            except:
-                raise ValueError("ngrid must be an int, or easily convertable to int!")
+            ngrid = int(ngrid)
 
         # Check if center is a Position
         if isinstance(center,galsim.PositionD):
@@ -467,17 +499,9 @@ class PowerSpectrum(object):
         if isinstance(pf,str):
             import os
             if os.path.isfile(pf):
-                try:
-                    pf = galsim.LookupTable(file=pf)
-                except :
-                    raise AttributeError(
-                        "Unable to read %s = %s as a LookupTable"%(pf_str,pf))
+                pf = galsim.LookupTable(file=pf)
             else:
-                try : 
-                    pf = eval('lambda k : ' + pf)
-                except :
-                    raise AttributeError(
-                        "Unable to turn %s = %s into a valid function"%(pf_str,pf))
+                pf = eval('lambda k : ' + pf)
 
         # Check that the function is sane.
         # Note: Only try tests below if it's not a LookupTable.
@@ -485,10 +509,7 @@ class PowerSpectrum(object):
         #        defined at k=1, and by definition it must return something that is the 
         #        same length as the input.)
         if not isinstance(pf, galsim.LookupTable):
-            try:
-                f1 = pf(1.)
-            except:
-                raise AttributeError("%s is not a valid function"%pf_str)
+            f1 = pf(np.array((0.1,1.)))
             fake_arr = np.zeros(2)
             fake_p = pf(fake_arr)
             if isinstance(fake_p, float):
@@ -509,7 +530,8 @@ class PowerSpectrum(object):
         Note that the interpolation (carried out using the interpolant that was specified when
         building the gridded shears) modifies the effective power spectrum somewhat.  The user is
         responsible for choosing a grid size that is small enough not to significantly modify the
-        power spectrum on the scales of interest.
+        power spectrum on the scales of interest.  Detailed tests of this functionality have not
+        been carried out.
 
         Some examples of how to use getShear:
 
@@ -598,6 +620,7 @@ class PowerSpectrum(object):
             else:
                 g1.append(sbii_g1.xValue(iter_pos+self.offset))
                 g2.append(sbii_g2.xValue(iter_pos+self.offset))
+
         if isinstance(pos, galsim.PositionD):
             return g1[0], g2[0]
         elif isinstance(pos[0], np.ndarray):
@@ -668,6 +691,7 @@ class PowerSpectrum(object):
                 kappa.append(0.)
             else:
                 kappa.append(sbii_kappa.xValue(iter_pos+self.offset))
+
         if isinstance(pos, galsim.PositionD):
             return kappa[0]
         elif isinstance(pos[0], np.ndarray):
@@ -745,6 +769,7 @@ class PowerSpectrum(object):
                 mu.append(0.)
             else:
                 mu.append(sbii_mu.xValue(iter_pos+self.offset))
+
         if isinstance(pos, galsim.PositionD):
             return mu[0]
         elif isinstance(pos[0], np.ndarray):
@@ -834,6 +859,7 @@ class PowerSpectrum(object):
                 g1.append(sbii_g1.xValue(iter_pos+self.offset))
                 g2.append(sbii_g2.xValue(iter_pos+self.offset))
                 mu.append(sbii_mu.xValue(iter_pos+self.offset))
+
         if isinstance(pos, galsim.PositionD):
             return g1[0], g2[0], mu[0]
         elif isinstance(pos[0], np.ndarray):
@@ -1051,22 +1077,22 @@ class Cosmology(object):
         self.omega_r = 0
     
     def a(self, z):
-        """Compute scale factor
+        """Compute scale factor.
 
         @param z Redshift
         """
         return 1./(1+z)
 
     def E(self, a):
-        """Evaluates expansion function
+        """Evaluates expansion function.
 
-        @param a Scale factor
+        @param a Scale factor.
         """
         return (self.omega_r*a**(-4) + self.omega_m*a**(-3) + self.omega_c*a**(-2) + \
                 self.omega_lam)**0.5
 
     def __angKernel(self, x):
-        """Integration kernel for angular diameter distance computation
+        """Integration kernel for angular diameter distance computation.
         """
         return self.E(x**-1)**-1
 
@@ -1075,7 +1101,7 @@ class Cosmology(object):
 
         In order to get the distance in Mpc/h, multiply by ~3000.
 
-        @param z Redshift
+        @param z     Redshift.
         @param z_ref Reference redshift, with z_ref <= z.
         """
         if isinstance(z, np.ndarray):
@@ -1118,9 +1144,9 @@ class NFWHalo(object):
     @param conc       Concentration parameter, i.e., ratio of virial radius to NFW scale radius.
     @param redshift   Redshift of the halo.
     @param halo_pos   Position of halo center (in arcsec). [default=PositionD(0,0)]
-    @param omega_m    Omega_matter to pass to Cosmology constructor [default=None]
-    @param omega_lam  Omega_lambda to pass to Cosmology constructor [default=None]
-    @param cosmo      A Cosmology instance [default=None]
+    @param omega_m    Omega_matter to pass to Cosmology constructor. [default=None]
+    @param omega_lam  Omega_lambda to pass to Cosmology constructor. [default=None]
+    @param cosmo      A Cosmology instance. [default=None]
     """
     _req_params = { 'mass' : float , 'conc' : float , 'redshift' : float }
     _opt_params = { 'halo_pos' : galsim.PositionD , 'omega_m' : float , 'omega_lam' : float }
@@ -1176,7 +1202,7 @@ class NFWHalo(object):
         self.rs_arcsec = scale/arcsec2rad;
 
     def __omega(self, a):
-        """Matter density at scale factor a
+        """Matter density at scale factor a.
         """
         return self.cosmo.omega_m/(self.cosmo.E(a)**2 * a**3)
 
@@ -1299,7 +1325,7 @@ class NFWHalo(object):
                            - Multidimensional NumPy array, as long as array[0] contains
                              x-positions and array[1] contains y-positions
         @param z_s       Source redshift(s).
-        @param units     Angular units of coordinates [default = arcsec]
+        @param units     Angular units of coordinates. [default = arcsec]
         @param reduced   Whether returned shear(s) should be reduced shears. [default=True]
 
         @return (g1,g2)   [g1 and g2 are each a list if input was a list]
@@ -1334,7 +1360,7 @@ class NFWHalo(object):
         # until you know that it can be indexed, i.e., that it's not just a single PositionD,
         # because then bad things will happen (TypeError).
         if isinstance(pos, galsim.PositionD):
-            return g1, g2
+            return g1[0], g2[0]
         if isinstance(pos[0], np.ndarray):
             return g1, g2
         elif len(g) == 1 and not isinstance(pos[0],list):
@@ -1356,10 +1382,10 @@ class NFWHalo(object):
                          - tuple of NumPy arrays: ( xarray, yarray )
                          - Multidimensional NumPy array, as long as array[0] contains
                            x-positions and array[1] contains y-positions
-        @param z_s     Source redshift(s)
-        @param units   Angular units of coordinates [default = arcsec]
+        @param z_s     Source redshift(s).
+        @param units   Angular units of coordinates. [default = arcsec]
 
-        @return kappa or list of kappa values
+        @return kappa or list of kappa values.
         """
 
         # Convert to numpy arrays for internal usage:
@@ -1383,7 +1409,7 @@ class NFWHalo(object):
         elif len(kappa) == 1 and not isinstance(pos[0], list):
             return kappa[0]
         else:
-            return [ k for k in kappa ]
+            return kappa.tolist()
 
     def getMagnification(self, pos, z_s, units=galsim.arcsec):
         """Calculate magnification of halo at specified positions.
@@ -1398,9 +1424,9 @@ class NFWHalo(object):
                          - tuple of NumPy arrays: ( xarray, yarray )
                          - Multidimensional NumPy array, as long as array[0] contains
                            x-positions and array[1] contains y-positions
-        @param z_s     Source redshift(s)
+        @param z_s     Source redshift(s).
         @param units   Angular units of coordinates (only arcsec implemented so far).
-        @return mu     Numpy array containing the magnification at the specified position(s)
+        @return mu     Numpy array containing the magnification at the specified position(s).
         """
         # Convert to numpy arrays for internal usage:
         pos_x, pos_y = _convertPositions(pos, units, 'getMagnification')
@@ -1426,7 +1452,7 @@ class NFWHalo(object):
         elif len(mu) == 1 and not isinstance(pos[0],list):
             return mu[0]
         else:
-            return [ m for m in mu ]
+            return mu.tolist()
 
     def getLensing(self, pos, z_s, units=galsim.arcsec):
         """Calculate lensing shear and magnification of halo at specified positions.
@@ -1441,7 +1467,7 @@ class NFWHalo(object):
                              - tuple of NumPy arrays: ( xarray, yarray )
                              - Multidimensional NumPy array, as long as array[0] contains
                                x-positions and array[1] contains y-positions
-        @param z_s         Source redshift(s)
+        @param z_s         Source redshift(s).
         @param units       Angular units of coordinates (only arcsec implemented so far).
         @return g1,g2,mu   Reduced shears and magnifications.
         """
